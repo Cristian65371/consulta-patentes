@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consulta de Patentes - Optimizado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #0056b3;
+      --secondary-color: #e9f5ff;
+      --border-color: #ced4da;
+      --light-bg: #f8f9fa;
+      --white-bg: #fff;
+      --text-color: #333;
+      --header-text-color: #004085;
+      --error-color: #dc3545;
+      --error-bg: #f8d7da;
+      --info-color: #004085;
+      --info-bg: #cce5ff;
+    }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      padding: 20px;
+      background-color: var(--light-bg);
+      color: var(--text-color);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 960px; /* Un poco más ancho para mejor visualización */
+      margin: 20px auto;
+      background-color: var(--white-bg);
+      padding: 30px 40px;
+      border-radius: 10px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    h2 {
+      color: var(--primary-color);
+      text-align: center;
+      margin-bottom: 35px;
+      font-weight: 700;
+      font-size: 2.2em;
+      letter-spacing: 0.5px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: var(--header-text-color);
+      font-size: 1.05em;
+    }
+
+    input[type="file"],
+    input[type="text"] {
+      padding: 12px 15px;
+      width: 100%;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+      font-size: 1.05em;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #66b3ff;
+      outline: none;
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    input[type="text"]:disabled {
+      background-color: #eef2f5;
+      cursor: not-allowed;
+      opacity: 0.8;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      border: 1px solid #e0e6eb;
+      padding: 14px 18px;
+      text-align: left;
+      font-size: 0.95em;
+    }
+
+    th {
+      background-color: var(--secondary-color);
+      color: var(--primary-color);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f7fbff;
+    }
+
+    tr:hover {
+      background-color: #eaf6ff;
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    .no-result, .error-message, .info-message {
+      padding: 15px 20px;
+      border-radius: 6px;
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 1.1em;
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    .error-message {
+      color: var(--error-color);
+      background-color: var(--error-bg);
+      border: 1px solid #f5c6cb;
+    }
+
+    .info-message {
+      color: var(--info-color);
+      background-color: var(--info-bg);
+      border: 1px solid #b8daff;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Consulta de Patentes</h2>
+
+    <label for="csvFile">Subir archivo CSV:</label>
+    <input type="file" id="csvFile" accept=".csv">
+
+    <label for="buscador">Buscar por RUT, Nombre o Dirección:</label>
+    <input type="text" id="buscador" placeholder="Buscar por RUT, Nombre o Dirección" disabled>
+
+    <div id="mensaje" class="info-message">Por favor, sube un archivo CSV (delimitado por ';') para empezar a buscar.</div>
+    <div id="resultado"></div>
+  </div>
+
+  <script>
+    let datos = [];
+    let debounceTimer;
+
+    function mostrarMensaje(tipo, texto) {
+      const mensajeDiv = document.getElementById("mensaje");
+      mensajeDiv.className = tipo === 'error' ? 'error-message' : (tipo === 'info' ? 'info-message' : '');
+      mensajeDiv.textContent = texto;
+      mensajeDiv.style.display = 'block';
+    }
+
+    function ocultarMensaje() {
+      document.getElementById("mensaje").style.display = 'none';
+    }
+
+    document.getElementById("csvFile").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        mostrarMensaje('error', 'No se seleccionó ningún archivo.');
+        document.getElementById("buscador").disabled = true;
+        document.getElementById("resultado").innerHTML = "";
+        return;
+      }
+
+      if (file.type !== 'text/csv' && !file.name.toLowerCase().endsWith('.csv')) {
+        mostrarMensaje('error', 'Por favor, selecciona un archivo CSV válido (.csv).');
+        document.getElementById("buscador").disabled = true;
+        document.getElementById("resultado").innerHTML = "";
+        e.target.value = '';
+        return;
+      }
+
+      mostrarMensaje('info', 'Cargando y procesando archivo. Esto puede tardar unos segundos para archivos grandes...');
+      document.getElementById("buscador").disabled = true;
+      document.getElementById("resultado").innerHTML = "";
+
+      Papa.parse(file, {
+        header: true,
+        delimiter: ";",
+        skipEmptyLines: true,
+        encoding: "UTF-8",
+        
+        transformHeader: function(header) {
+          let cleanedHeader = header.trim().toUpperCase();
+          if (cleanedHeader.includes('ACLARACI')) {
+            return 'ACLARACION';
+          }
+          if (cleanedHeader === 'DIRECCION') {
+              return 'DIRECCIÓN';
+          }
+          return cleanedHeader;
+        },
+        
+        complete: function(results) {
+          if (results.errors.length > 0) {
+            console.error("Errores de Papa Parse:", results.errors);
+            mostrarMensaje('error', `Error al procesar el archivo CSV: ${results.errors[0].message}. Verifica el formato y el delimitador (punto y coma).`);
+            document.getElementById("buscador").disabled = true;
+            return;
+          }
+
+          datos = results.data.map(row => {
+            const cleanedRow = {};
+            for (const key in row) {
+              if (Object.prototype.hasOwnProperty.call(row, key)) {
+                cleanedRow[key] = String(row[key] || '').trim();
+              }
+            }
+            return cleanedRow;
+          });
+
+          if (datos.length === 0) {
+            mostrarMensaje('info', 'El archivo CSV no contiene datos procesables después de la cabecera.');
+            document.getElementById("buscador").disabled = true;
+            return;
+          }
+
+          document.getElementById("buscador").disabled = false;
+          ocultarMensaje();
+          // NO LLAMAMOS A 'buscar()' AQUÍ INICIALMENTE.
+          // La tabla se mostrará solo cuando el usuario empiece a escribir.
+          document.getElementById("resultado").innerHTML = ""; // Asegurarse de que esté vacía al cargar el archivo
+        },
+        
+        error: function(err, file) {
+          console.error("Error al leer el archivo con Papa Parse:", err);
+          mostrarMensaje('error', 'Hubo un problema al leer el archivo. Asegúrate de que no esté corrupto.');
+          document.getElementById("buscador").disabled = true;
+          document.getElementById("resultado").innerHTML = "";
+        }
+      });
+    });
+
+    document.getElementById("buscador").addEventListener("input", function() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(buscar, 300); 
+    });
+
+    function buscar() {
+      if (document.getElementById("buscador").disabled || datos.length === 0) {
+        document.getElementById("resultado").innerHTML = "";
+        return;
+      }
+
+      const valorBusqueda = document.getElementById("buscador").value.toLowerCase().trim(); // Añadido .trim()
+
+      // *** MODIFICACIÓN CLAVE AQUÍ ***
+      if (valorBusqueda === "") {
+        document.getElementById("resultado").innerHTML = ""; // Limpia la tabla si el buscador está vacío
+        ocultarMensaje(); // Oculta cualquier mensaje de "No hay coincidencias"
+        return; // Salir de la función si no hay texto de búsqueda
+      }
+      // ******************************
+      
+      const resultados = datos.filter(fila => {
+        const rut = String(fila["RUT"] || '').toLowerCase();
+        const nombre = String(fila["NOMBRE"] || '').toLowerCase();
+        const direccion = String(fila["DIRECCIÓN"] || '').toLowerCase();
+
+        return rut.includes(valorBusqueda) ||
+               nombre.includes(valorBusqueda) ||
+               direccion.includes(valorBusqueda);
+      });
+
+      const contenedor = document.getElementById("resultado");
+      const MAX_RESULTADOS_MOSTRADOS = 500;
+
+      if (resultados.length === 0) {
+        contenedor.innerHTML = `<p class="no-result">No hay coincidencias para "${valorBusqueda}"</p>`;
+        return;
+      }
+
+      let html = "<table><thead><tr>";
+      if (datos.length > 0 && Object.keys(datos[0]).length > 0) {
+        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`); 
+      }
+      html += "</tr></thead><tbody>";
+
+      resultados.slice(0, MAX_RESULTADOS_MOSTRADOS).forEach(fila => {
+        html += "<tr>";
+        Object.keys(datos[0]).forEach(col => { 
+            html += `<td>${fila[col] || ''}</td>`; 
+        });
+        html += "</tr>";
+      });
+      html += "</tbody></table>";
+
+      if (resultados.length > MAX_RESULTADOS_MOSTRADOS) {
+          html += `<p class="info-message">Se encontraron ${resultados.length} resultados. Mostrando los primeros ${MAX_RESULTADOS_MOSTRADOS}. Para ver más, afina tu búsqueda.</p>`;
+      }
+
+      contenedor.innerHTML = html;
+      ocultarMensaje();
+    }
+  </script>
+
+</body>
+</html>
