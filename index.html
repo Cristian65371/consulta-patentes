@@ -314,39 +314,37 @@
         ocultarMensaje();
         return;
       }
-
+      
       let direccionBuscada = "";
       let numeroBuscado = "";
-
-      // Intentar dividir la búsqueda en dirección y número
+      
       const partes = valorBusqueda.split(" ").filter(part => part.length > 0);
       if (partes.length > 1) {
-        const ultimoElemento = partes[partes.length - 1];
-        // Verificar si el último elemento es un número o si parece ser un número (con letras al final)
-        const match = ultimoElemento.match(/^(\d+)([a-zA-Z]?)$/);
-        if (match) {
-          numeroBuscado = ultimoElemento;
-          direccionBuscada = partes.slice(0, -1).join(" ");
-        } else {
-          // Si el último elemento no es un número, se busca toda la cadena en la dirección
-          direccionBuscada = valorBusqueda;
-        }
+          const ultimoElemento = partes[partes.length - 1];
+          // Utilizar una expresión regular para verificar si el último elemento es un número, opcionalmente seguido de una o más letras
+          if (/^\d+[a-zA-Z]*$/.test(ultimoElemento)) {
+              numeroBuscado = ultimoElemento;
+              direccionBuscada = partes.slice(0, -1).join(" ");
+          } else {
+              direccionBuscada = valorBusqueda;
+          }
       } else {
-        direccionBuscada = valorBusqueda;
+          direccionBuscada = valorBusqueda;
       }
-      
+
       let resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
         const direccion = String(fila["DIRECCION"] || '').toLowerCase();
         const numero = String(fila["NUMERO"] || '').toLowerCase();
-
-        // Lógica de búsqueda mejorada
+        
+        // Lógica de búsqueda mejorada para manejar dirección y número
         if (direccionBuscada && numeroBuscado) {
-          // Si se detectó dirección y número, buscar coincidencia en ambas columnas
-          return direccion.includes(direccionBuscada) && numero.includes(numeroBuscado);
+          // Si hay dirección y número, verificar que la dirección comience con la cadena de búsqueda
+          // y que el número comience con la cadena de búsqueda
+          return direccion.startsWith(direccionBuscada) && numero.startsWith(numeroBuscado);
         } else {
-          // Si solo hay una palabra, buscar en todas las columnas
+          // Si solo se busca una palabra o una cadena, buscar en todas las columnas
           return rut.includes(valorBusqueda) ||
                  nombre.includes(valorBusqueda) ||
                  direccion.includes(valorBusqueda) ||
