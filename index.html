@@ -315,27 +315,42 @@
         return;
       }
 
+      // Separar la dirección del número si el valor de búsqueda contiene ambos
+      let direccionBuscada = "";
+      let numeroBuscado = "";
+      const partes = valorBusqueda.split(" ");
+      if (partes.length > 1) {
+          // Si el último "fragmento" de la búsqueda es un número, asumimos que es el número de la calle
+          if (!isNaN(parseFloat(partes[partes.length - 1])) && isFinite(partes[partes.length - 1])) {
+              numeroBuscado = partes.pop(); // Saca el número del final
+              direccionBuscada = partes.join(" "); // Une el resto para la dirección
+          } else {
+              direccionBuscada = valorBusqueda;
+          }
+      } else {
+          direccionBuscada = valorBusqueda;
+      }
+
       let resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
         const direccion = String(fila["DIRECCION"] || '').toLowerCase();
         const numero = String(fila["NUMERO"] || '').toLowerCase();
-        
-        // ¡NUEVO CAMBIO! La búsqueda solo se realiza en el nombre de la dirección si el valor no es un número.
-        // Si el valor es un número, se busca en la columna de números.
-        const esNumero = !isNaN(parseFloat(valorBusqueda)) && isFinite(valorBusqueda);
 
-        if (esNumero) {
-          // Si el valor de búsqueda es un número, busca solo en la columna NUMERO
-          return numero.includes(valorBusqueda);
+        // Lógica de búsqueda mejorada:
+        if (numeroBuscado !== "") {
+          // Si se detectó un número, se busca coincidencia exacta en dirección y número
+          return direccion.includes(direccionBuscada) && numero.includes(numeroBuscado);
         } else {
-          // Si el valor de búsqueda es texto, busca en el resto de las columnas
+          // Si no se detectó un número, la búsqueda se realiza en todas las columnas
           return rut.includes(valorBusqueda) ||
                  nombre.includes(valorBusqueda) ||
-                 direccion.includes(valorBusqueda);
+                 direccion.includes(valorBusqueda) ||
+                 numero.includes(valorBusqueda);
         }
       });
 
+      // Ordenar resultados primero por la dirección (alfabéticamente) y luego por el número (numéricamente)
       resultados.sort((a, b) => {
           const dirA = (a["DIRECCION"] || '').toLowerCase();
           const dirB = (b["DIRECCION"] || '').toLowerCase();
@@ -349,4 +364,35 @@
       });
 
       const contenedor = document.getElementById("resultado");
-      const MAX
+      const MAX_RESULTADOS_MOSTRADOS = 500;
+
+      if (resultados.length === 0) {
+        contenedor.innerHTML = `<p class="no-result">No hay coincidencias para "${valorBusqueda}"</p>`;
+        return;
+      }
+
+      let html = "<table><thead><tr>";
+      if (datos.length > 0 && Object.keys(datos[0]).length > 0) {
+        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`);
+      }
+      html += "</tr></thead><tbody>";
+
+      resultados.slice(0, MAX_RESULTADOS_MOSTRADOS).forEach(fila => {
+        html += "<tr>";
+        Object.keys(datos[0]).forEach(col => {
+            html += `<td>${fila[col] || ''}</td>`;
+        });
+        html += "</tr>";
+      });
+      html += "</tbody></table>";
+
+      if (resultados.length > MAX_RESULTADOS_MOSTRADOS) {
+          html += `<p class="info-message">Se encontraron ${resultados.length} resultados. Mostrando los primeros ${MAX_RESULTADOS_MOSTRADOS}. Para ver más, afina tu búsqueda.</p>`;
+      }
+
+      contenedor.innerHTML = html;
+      ocultarMensaje();
+    }
+  </script>
+</body>
+</html>
