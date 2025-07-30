@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consulta de patentes comuna de Santiago-Carga Automática</title>
+  <title>Consulta de patentes comuna de Santiago</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -179,9 +179,8 @@
   <script>
     let datos = [];
     let debounceTimer;
-
+    
     // *** CONFIGURACIÓN CLAVE: URL de tu archivo CSV ***
-    // ¡HE CAMBIADO ESTA URL A LA DE GITHUB PAGES DIRECTA!
     const CSV_URL = 'https://cristian65371.github.io/consulta-patentes/datos_patentes.csv';
 
     // --- Funciones de Utilidad para la Interfaz ---
@@ -317,7 +316,7 @@
         return;
       }
       
-      const resultados = datos.filter(fila => {
+      let resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
         const direccion = String(fila["DIRECCIÓN"] || '').toLowerCase();
@@ -325,6 +324,15 @@
         return rut.includes(valorBusqueda) ||
                nombre.includes(valorBusqueda) ||
                direccion.includes(valorBusqueda);
+      });
+
+      // ¡NUEVO CÓDIGO! Ordenar los resultados por la columna 'DIRECCIÓN'
+      resultados.sort((a, b) => {
+          const dirA = (a["DIRECCIÓN"] || '').toLowerCase();
+          const dirB = (b["DIRECCIÓN"] || '').toLowerCase();
+          if (dirA < dirB) return -1;
+          if (dirA > dirB) return 1;
+          return 0;
       });
 
       const contenedor = document.getElementById("resultado");
