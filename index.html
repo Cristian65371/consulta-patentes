@@ -320,19 +320,22 @@
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
         const direccion = String(fila["DIRECCION"] || '').toLowerCase();
         const numero = String(fila["NUMERO"] || '').toLowerCase();
-        const local = String(fila["LOCAL"] || '').toLowerCase(); // Nuevo: Añadir columna LOCAL a la búsqueda
-        const giro = String(fila["GIRO"] || '').toLowerCase();   // Nuevo: Añadir columna GIRO a la búsqueda
+        
+        // ¡NUEVO CAMBIO! La búsqueda solo se realiza en el nombre de la dirección si el valor no es un número.
+        // Si el valor es un número, se busca en la columna de números.
+        const esNumero = !isNaN(parseFloat(valorBusqueda)) && isFinite(valorBusqueda);
 
-        // Lógica de búsqueda modificada para una coincidencia más específica
-        return (rut.includes(valorBusqueda)) ||
-               (nombre.includes(valorBusqueda)) ||
-               (direccion.includes(valorBusqueda)) ||
-               (numero.includes(valorBusqueda)) ||
-               (local.includes(valorBusqueda)) ||
-               (giro.includes(valorBusqueda));
+        if (esNumero) {
+          // Si el valor de búsqueda es un número, busca solo en la columna NUMERO
+          return numero.includes(valorBusqueda);
+        } else {
+          // Si el valor de búsqueda es texto, busca en el resto de las columnas
+          return rut.includes(valorBusqueda) ||
+                 nombre.includes(valorBusqueda) ||
+                 direccion.includes(valorBusqueda);
+        }
       });
 
-      // Ordenar resultados primero por la dirección (alfabéticamente) y luego por el número (numéricamente)
       resultados.sort((a, b) => {
           const dirA = (a["DIRECCION"] || '').toLowerCase();
           const dirB = (b["DIRECCION"] || '').toLowerCase();
@@ -346,36 +349,4 @@
       });
 
       const contenedor = document.getElementById("resultado");
-      const MAX_RESULTADOS_MOSTRADOS = 500;
-
-      if (resultados.length === 0) {
-        contenedor.innerHTML = `<p class="no-result">No hay coincidencias para "${valorBusqueda}"</p>`;
-        return;
-      }
-
-      let html = "<table><thead><tr>";
-      if (datos.length > 0 && Object.keys(datos[0]).length > 0) {
-        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`);
-      }
-      html += "</tr></thead><tbody>";
-
-      resultados.slice(0, MAX_RESULTADOS_MOSTRADOS).forEach(fila => {
-        html += "<tr>";
-        Object.keys(datos[0]).forEach(col => {
-            html += `<td>${fila[col] || ''}</td>`;
-        });
-        html += "</tr>";
-      });
-      html += "</tbody></table>";
-
-      if (resultados.length > MAX_RESULTADOS_MOSTRADOS) {
-          html += `<p class="info-message">Se encontraron ${resultados.length} resultados. Mostrando los primeros ${MAX_RESULTADOS_MOSTRADOS}. Para ver más, afina tu búsqueda.</p>`;
-      }
-
-      contenedor.innerHTML = html;
-      ocultarMensaje();
-    }
-  </script>
-
-</body>
-</html>
+      const MAX
