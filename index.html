@@ -140,7 +140,6 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Estilos para la barra de progreso */
     #progressBarContainer {
       width: 100%;
       background-color: #e0e0e0;
@@ -166,7 +165,7 @@
   <div class="container">
     <h2>Consulta de Patentes</h2>
 
-    <label for="buscador">Buscar por RUT, Nombre o Dirección:</label>
+    <label for="buscador">Buscar por RUT, Nombre, Dirección o Número:</label>
     <input type="text" id="buscador" placeholder="Esperando carga del archivo..." disabled>
 
     <div id="mensaje" class="info-message">Cargando datos. Esto puede tardar unos segundos...</div>
@@ -218,18 +217,22 @@
                 delimiter: ";",
                 skipEmptyLines: true,
                 encoding: "UTF-8",
-
+                
+                // Mapeo para que el código reconozca las nuevas columnas
                 transformHeader: function(header) {
                     let cleanedHeader = header.trim().toUpperCase();
+                    if (cleanedHeader.includes('DIRECCION')) {
+                        return 'DIRECCION';
+                    }
+                    if (cleanedHeader.includes('NUMERO')) {
+                        return 'NUMERO';
+                    }
                     if (cleanedHeader.includes('ACLARACI')) {
                         return 'ACLARACION';
                     }
-                    if (cleanedHeader === 'DIRECCION') {
-                        return 'DIRECCIÓN';
-                    }
                     return cleanedHeader;
                 },
-
+                
                 complete: function(results) {
                     if (results.errors.length > 0) {
                         console.error("Errores de Papa Parse:", results.errors);
@@ -259,14 +262,14 @@
                     }
 
                     document.getElementById("buscador").disabled = false;
-                    document.getElementById("buscador").placeholder = "Buscar por RUT, Nombre o Dirección";
+                    document.getElementById("buscador").placeholder = "Buscar por RUT, Nombre, Dirección o Número";
                     ocultarMensaje();
                     ocultarProgreso();
                     document.getElementById("resultado").innerHTML = "";
                     mostrarMensaje('info', `¡Datos cargados! ${datos.length} registros listos para buscar.`);
                     setTimeout(() => ocultarMensaje(), 3000);
                 },
-
+                
                 error: function(err, file) {
                     console.error("Error Papa Parse durante descarga/parseo:", err);
                     mostrarMensaje('error', `No se pudo cargar o procesar el archivo CSV. Error: ${err.message}. Asegúrate que la URL es correcta y el archivo es accesible.`);
@@ -296,7 +299,7 @@
 
     document.getElementById("buscador").addEventListener("input", function() {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(buscar, 300);
+      debounceTimer = setTimeout(buscar, 300); 
     });
 
     function buscar() {
@@ -312,33 +315,30 @@
         ocultarMensaje();
         return;
       }
-
+      
       let resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
-        const direccion = String(fila["DIRECCIÓN"] || '').toLowerCase();
+        const direccion = String(fila["DIRECCION"] || '').toLowerCase();
+        const numero = String(fila["NUMERO"] || '').toLowerCase();
 
         return rut.includes(valorBusqueda) ||
                nombre.includes(valorBusqueda) ||
-               direccion.includes(valorBusqueda);
+               direccion.includes(valorBusqueda) ||
+               numero.includes(valorBusqueda);
       });
 
-      // ¡NUEVO CÓDIGO! Ordenar los resultados por la numeración de la dirección
+      // Ordenar resultados primero por la dirección (alfabéticamente) y luego por el número (numéricamente)
       resultados.sort((a, b) => {
-          const dirA = (a["DIRECCIÓN"] || '').toLowerCase();
-          const dirB = (b["DIRECCIÓN"] || '').toLowerCase();
+          const dirA = (a["DIRECCION"] || '').toLowerCase();
+          const dirB = (b["DIRECCION"] || '').toLowerCase();
+          const numA = parseInt(a["NUMERO"]) || 0;
+          const numB = parseInt(b["NUMERO"]) || 0;
 
-          // Regex para encontrar el primer número en la dirección
-          const numA = parseInt(dirA.match(/\d+/)) || 0;
-          const numB = parseInt(dirB.match(/\d+/)) || 0;
+          if (dirA < dirB) return -1;
+          if (dirA > dirB) return 1;
 
-          // Criterio de ordenación:
-          // 1. Primero, ordenar por el número de la calle.
-          if (numA !== numB) {
-              return numA - numB;
-          }
-          // 2. Si los números son iguales, ordenar alfabéticamente por toda la dirección.
-          return dirA.localeCompare(dirB);
+          return numA - numB;
       });
 
       const contenedor = document.getElementById("resultado");
@@ -351,14 +351,14 @@
 
       let html = "<table><thead><tr>";
       if (datos.length > 0 && Object.keys(datos[0]).length > 0) {
-        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`);
+        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`); 
       }
       html += "</tr></thead><tbody>";
 
       resultados.slice(0, MAX_RESULTADOS_MOSTRADOS).forEach(fila => {
         html += "<tr>";
-        Object.keys(datos[0]).forEach(col => {
-            html += `<td>${fila[col] || ''}</td>`;
+        Object.keys(datos[0]).forEach(col => { 
+            html += `<td>${fila[col] || ''}</td>`; 
         });
         html += "</tr>";
       });
