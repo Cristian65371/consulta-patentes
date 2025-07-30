@@ -179,11 +179,9 @@
   <script>
     let datos = [];
     let debounceTimer;
-    
-    // *** CONFIGURACIÓN CLAVE: URL de tu archivo CSV ***
+
     const CSV_URL = 'https://cristian65371.github.io/consulta-patentes/datos_patentes.csv';
 
-    // --- Funciones de Utilidad para la Interfaz ---
     function mostrarMensaje(tipo, texto) {
       const mensajeDiv = document.getElementById("mensaje");
       mensajeDiv.className = tipo === 'error' ? 'error-message' : (tipo === 'info' ? 'info-message' : '');
@@ -207,7 +205,6 @@
         document.getElementById("progressBarContainer").style.display = 'none';
     }
 
-    // --- Función para cargar el CSV desde la URL ---
     async function cargarCSVDesdeURL() {
         mostrarMensaje('info', 'Iniciando carga de datos remotos...');
         document.getElementById("buscador").disabled = true;
@@ -221,7 +218,7 @@
                 delimiter: ";",
                 skipEmptyLines: true,
                 encoding: "UTF-8",
-                
+
                 transformHeader: function(header) {
                     let cleanedHeader = header.trim().toUpperCase();
                     if (cleanedHeader.includes('ACLARACI')) {
@@ -232,7 +229,7 @@
                     }
                     return cleanedHeader;
                 },
-                
+
                 complete: function(results) {
                     if (results.errors.length > 0) {
                         console.error("Errores de Papa Parse:", results.errors);
@@ -269,7 +266,7 @@
                     mostrarMensaje('info', `¡Datos cargados! ${datos.length} registros listos para buscar.`);
                     setTimeout(() => ocultarMensaje(), 3000);
                 },
-                
+
                 error: function(err, file) {
                     console.error("Error Papa Parse durante descarga/parseo:", err);
                     mostrarMensaje('error', `No se pudo cargar o procesar el archivo CSV. Error: ${err.message}. Asegúrate que la URL es correcta y el archivo es accesible.`);
@@ -299,7 +296,7 @@
 
     document.getElementById("buscador").addEventListener("input", function() {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(buscar, 300); 
+      debounceTimer = setTimeout(buscar, 300);
     });
 
     function buscar() {
@@ -315,7 +312,7 @@
         ocultarMensaje();
         return;
       }
-      
+
       let resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
@@ -326,13 +323,22 @@
                direccion.includes(valorBusqueda);
       });
 
-      // ¡NUEVO CÓDIGO! Ordenar los resultados por la columna 'DIRECCIÓN'
+      // ¡NUEVO CÓDIGO! Ordenar los resultados por la numeración de la dirección
       resultados.sort((a, b) => {
           const dirA = (a["DIRECCIÓN"] || '').toLowerCase();
           const dirB = (b["DIRECCIÓN"] || '').toLowerCase();
-          if (dirA < dirB) return -1;
-          if (dirA > dirB) return 1;
-          return 0;
+
+          // Regex para encontrar el primer número en la dirección
+          const numA = parseInt(dirA.match(/\d+/)) || 0;
+          const numB = parseInt(dirB.match(/\d+/)) || 0;
+
+          // Criterio de ordenación:
+          // 1. Primero, ordenar por el número de la calle.
+          if (numA !== numB) {
+              return numA - numB;
+          }
+          // 2. Si los números son iguales, ordenar alfabéticamente por toda la dirección.
+          return dirA.localeCompare(dirB);
       });
 
       const contenedor = document.getElementById("resultado");
@@ -345,14 +351,14 @@
 
       let html = "<table><thead><tr>";
       if (datos.length > 0 && Object.keys(datos[0]).length > 0) {
-        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`); 
+        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`);
       }
       html += "</tr></thead><tbody>";
 
       resultados.slice(0, MAX_RESULTADOS_MOSTRADOS).forEach(fila => {
         html += "<tr>";
-        Object.keys(datos[0]).forEach(col => { 
-            html += `<td>${fila[col] || ''}</td>`; 
+        Object.keys(datos[0]).forEach(col => {
+            html += `<td>${fila[col] || ''}</td>`;
         });
         html += "</tr>";
       });
