@@ -217,8 +217,7 @@
                 delimiter: ";",
                 skipEmptyLines: true,
                 encoding: "UTF-8",
-                
-                // Mapeo para que el código reconozca las nuevas columnas
+
                 transformHeader: function(header) {
                     let cleanedHeader = header.trim().toUpperCase();
                     if (cleanedHeader.includes('DIRECCION')) {
@@ -232,7 +231,7 @@
                     }
                     return cleanedHeader;
                 },
-                
+
                 complete: function(results) {
                     if (results.errors.length > 0) {
                         console.error("Errores de Papa Parse:", results.errors);
@@ -269,7 +268,7 @@
                     mostrarMensaje('info', `¡Datos cargados! ${datos.length} registros listos para buscar.`);
                     setTimeout(() => ocultarMensaje(), 3000);
                 },
-                
+
                 error: function(err, file) {
                     console.error("Error Papa Parse durante descarga/parseo:", err);
                     mostrarMensaje('error', `No se pudo cargar o procesar el archivo CSV. Error: ${err.message}. Asegúrate que la URL es correcta y el archivo es accesible.`);
@@ -299,7 +298,7 @@
 
     document.getElementById("buscador").addEventListener("input", function() {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(buscar, 300); 
+      debounceTimer = setTimeout(buscar, 300);
     });
 
     function buscar() {
@@ -315,17 +314,22 @@
         ocultarMensaje();
         return;
       }
-      
+
       let resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
         const nombre = String(fila["NOMBRE"] || '').toLowerCase();
         const direccion = String(fila["DIRECCION"] || '').toLowerCase();
         const numero = String(fila["NUMERO"] || '').toLowerCase();
+        const local = String(fila["LOCAL"] || '').toLowerCase(); // Nuevo: Añadir columna LOCAL a la búsqueda
+        const giro = String(fila["GIRO"] || '').toLowerCase();   // Nuevo: Añadir columna GIRO a la búsqueda
 
-        return rut.includes(valorBusqueda) ||
-               nombre.includes(valorBusqueda) ||
-               direccion.includes(valorBusqueda) ||
-               numero.includes(valorBusqueda);
+        // Lógica de búsqueda modificada para una coincidencia más específica
+        return (rut.includes(valorBusqueda)) ||
+               (nombre.includes(valorBusqueda)) ||
+               (direccion.includes(valorBusqueda)) ||
+               (numero.includes(valorBusqueda)) ||
+               (local.includes(valorBusqueda)) ||
+               (giro.includes(valorBusqueda));
       });
 
       // Ordenar resultados primero por la dirección (alfabéticamente) y luego por el número (numéricamente)
@@ -351,14 +355,14 @@
 
       let html = "<table><thead><tr>";
       if (datos.length > 0 && Object.keys(datos[0]).length > 0) {
-        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`); 
+        Object.keys(datos[0]).forEach(col => html += `<th>${col}</th>`);
       }
       html += "</tr></thead><tbody>";
 
       resultados.slice(0, MAX_RESULTADOS_MOSTRADOS).forEach(fila => {
         html += "<tr>";
-        Object.keys(datos[0]).forEach(col => { 
-            html += `<td>${fila[col] || ''}</td>`; 
+        Object.keys(datos[0]).forEach(col => {
+            html += `<td>${fila[col] || ''}</td>`;
         });
         html += "</tr>";
       });
