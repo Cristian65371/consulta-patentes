@@ -181,8 +181,8 @@
     let debounceTimer;
 
     // *** CONFIGURACIÓN CLAVE: URL de tu archivo CSV ***
-    // ¡ESTA ES LA URL DE TU ARCHIVO datos_patentes.csv EN GITHUB!
-    const CSV_URL = 'https://github.com/Cristian65371/consulta-patentes/raw/refs/heads/main/datos_patentes.csv';
+    // ¡HE CAMBIADO ESTA URL A LA DE GITHUB PAGES DIRECTA!
+    const CSV_URL = 'https://cristian65371.github.io/consulta-patentes/datos_patentes.csv';
 
     // --- Funciones de Utilidad para la Interfaz ---
     function mostrarMensaje(tipo, texto) {
@@ -216,7 +216,6 @@
         ocultarProgreso();
 
         try {
-            // Papa Parse puede trabajar directamente con una URL y manejar la descarga y el parseo en streaming.
             Papa.parse(CSV_URL, {
                 download: true, // Esto le dice a Papa Parse que descargue el archivo de la URL
                 header: true,
@@ -269,7 +268,7 @@
                     ocultarProgreso();
                     document.getElementById("resultado").innerHTML = "";
                     mostrarMensaje('info', `¡Datos cargados! ${datos.length} registros listos para buscar.`);
-                    setTimeout(() => ocultarMensaje(), 3000); // Ocultar el mensaje después de 3 segundos
+                    setTimeout(() => ocultarMensaje(), 3000);
                 },
                 
                 error: function(err, file) {
@@ -297,10 +296,8 @@
         }
     }
 
-    // --- Iniciar la carga del CSV cuando la página se carga ---
     document.addEventListener('DOMContentLoaded', cargarCSVDesdeURL);
 
-    // --- Lógica de Búsqueda con Debounce ---
     document.getElementById("buscador").addEventListener("input", function() {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(buscar, 300); 
