@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consulta de Patentes Comuna Santiago - Carga Automática</title>
+  <title>Consulta de patentes comuna de Santiago</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -217,7 +217,7 @@
 
         try {
             Papa.parse(CSV_URL, {
-                download: true, // Esto le dice a Papa Parse que descargue el archivo de la URL
+                download: true,
                 header: true,
                 delimiter: ";",
                 skipEmptyLines: true,
