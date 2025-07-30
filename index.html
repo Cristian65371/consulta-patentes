@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consulta de Patentes - Optimizado</title>
+  <title>Consulta de Patentes - Carga Automática</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -32,7 +32,7 @@
     }
 
     .container {
-      max-width: 960px; /* Un poco más ancho para mejor visualización */
+      max-width: 960px;
       margin: 20px auto;
       background-color: var(--white-bg);
       padding: 30px 40px;
@@ -57,7 +57,6 @@
       font-size: 1.05em;
     }
 
-    input[type="file"],
     input[type="text"] {
       padding: 12px 15px;
       width: 100%;
@@ -140,6 +139,25 @@
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Estilos para la barra de progreso */
+    #progressBarContainer {
+      width: 100%;
+      background-color: #e0e0e0;
+      border-radius: 5px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    #progressBar {
+      width: 0%;
+      height: 20px;
+      background-color: var(--primary-color);
+      text-align: center;
+      line-height: 20px;
+      color: white;
+      border-radius: 5px;
+      transition: width 0.3s ease-in-out;
+    }
   </style>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
@@ -148,13 +166,13 @@
   <div class="container">
     <h2>Consulta de Patentes</h2>
 
-    <label for="csvFile">Subir archivo CSV:</label>
-    <input type="file" id="csvFile" accept=".csv">
-
     <label for="buscador">Buscar por RUT, Nombre o Dirección:</label>
-    <input type="text" id="buscador" placeholder="Buscar por RUT, Nombre o Dirección" disabled>
+    <input type="text" id="buscador" placeholder="Esperando carga del archivo..." disabled>
 
-    <div id="mensaje" class="info-message">Por favor, sube un archivo CSV (delimitado por ';') para empezar a buscar.</div>
+    <div id="mensaje" class="info-message">Cargando datos. Esto puede tardar unos segundos...</div>
+    <div id="progressBarContainer" style="display:none;">
+        <div id="progressBar">0%</div>
+    </div>
     <div id="resultado"></div>
   </div>
 
@@ -162,6 +180,11 @@
     let datos = [];
     let debounceTimer;
 
+    // *** CONFIGURACIÓN CLAVE: URL de tu archivo CSV ***
+    // ¡ESTA ES LA URL DE TU ARCHIVO datos_patentes.csv EN GITHUB!
+    const CSV_URL = 'https://github.com/Cristian65371/consulta-patentes/raw/refs/heads/main/datos_patentes.csv';
+
+    // --- Funciones de Utilidad para la Interfaz ---
     function mostrarMensaje(tipo, texto) {
       const mensajeDiv = document.getElementById("mensaje");
       mensajeDiv.className = tipo === 'error' ? 'error-message' : (tipo === 'info' ? 'info-message' : '');
@@ -173,84 +196,111 @@
       document.getElementById("mensaje").style.display = 'none';
     }
 
-    document.getElementById("csvFile").addEventListener("change", function(e) {
-      const file = e.target.files[0];
-      if (!file) {
-        mostrarMensaje('error', 'No se seleccionó ningún archivo.');
+    function actualizarProgreso(porcentaje) {
+        const progressBarContainer = document.getElementById("progressBarContainer");
+        const progressBar = document.getElementById("progressBar");
+        progressBarContainer.style.display = 'block';
+        progressBar.style.width = porcentaje + '%';
+        progressBar.textContent = Math.round(porcentaje) + '%';
+    }
+
+    function ocultarProgreso() {
+        document.getElementById("progressBarContainer").style.display = 'none';
+    }
+
+    // --- Función para cargar el CSV desde la URL ---
+    async function cargarCSVDesdeURL() {
+        mostrarMensaje('info', 'Iniciando carga de datos remotos...');
         document.getElementById("buscador").disabled = true;
-        document.getElementById("resultado").innerHTML = "";
-        return;
-      }
+        document.getElementById("buscador").placeholder = "Cargando datos...";
+        ocultarProgreso();
 
-      if (file.type !== 'text/csv' && !file.name.toLowerCase().endsWith('.csv')) {
-        mostrarMensaje('error', 'Por favor, selecciona un archivo CSV válido (.csv).');
-        document.getElementById("buscador").disabled = true;
-        document.getElementById("resultado").innerHTML = "";
-        e.target.value = '';
-        return;
-      }
+        try {
+            // Papa Parse puede trabajar directamente con una URL y manejar la descarga y el parseo en streaming.
+            Papa.parse(CSV_URL, {
+                download: true, // Esto le dice a Papa Parse que descargue el archivo de la URL
+                header: true,
+                delimiter: ";",
+                skipEmptyLines: true,
+                encoding: "UTF-8",
+                
+                transformHeader: function(header) {
+                    let cleanedHeader = header.trim().toUpperCase();
+                    if (cleanedHeader.includes('ACLARACI')) {
+                        return 'ACLARACION';
+                    }
+                    if (cleanedHeader === 'DIRECCION') {
+                        return 'DIRECCIÓN';
+                    }
+                    return cleanedHeader;
+                },
+                
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        console.error("Errores de Papa Parse:", results.errors);
+                        mostrarMensaje('error', `Error al procesar el archivo CSV: ${results.errors[0].message}. Verifica el formato y el delimitador (punto y coma).`);
+                        document.getElementById("buscador").disabled = true;
+                        document.getElementById("buscador").placeholder = "Error al cargar datos.";
+                        ocultarProgreso();
+                        return;
+                    }
 
-      mostrarMensaje('info', 'Cargando y procesando archivo. Esto puede tardar unos segundos para archivos grandes...');
-      document.getElementById("buscador").disabled = true;
-      document.getElementById("resultado").innerHTML = "";
+                    datos = results.data.map(row => {
+                        const cleanedRow = {};
+                        for (const key in row) {
+                            if (Object.prototype.hasOwnProperty.call(row, key)) {
+                                cleanedRow[key] = String(row[key] || '').trim();
+                            }
+                        }
+                        return cleanedRow;
+                    });
 
-      Papa.parse(file, {
-        header: true,
-        delimiter: ";",
-        skipEmptyLines: true,
-        encoding: "UTF-8",
-        
-        transformHeader: function(header) {
-          let cleanedHeader = header.trim().toUpperCase();
-          if (cleanedHeader.includes('ACLARACI')) {
-            return 'ACLARACION';
-          }
-          if (cleanedHeader === 'DIRECCION') {
-              return 'DIRECCIÓN';
-          }
-          return cleanedHeader;
-        },
-        
-        complete: function(results) {
-          if (results.errors.length > 0) {
-            console.error("Errores de Papa Parse:", results.errors);
-            mostrarMensaje('error', `Error al procesar el archivo CSV: ${results.errors[0].message}. Verifica el formato y el delimitador (punto y coma).`);
+                    if (datos.length === 0) {
+                        mostrarMensaje('info', 'El archivo CSV no contiene datos procesables.');
+                        document.getElementById("buscador").disabled = true;
+                        document.getElementById("buscador").placeholder = "No hay datos para buscar.";
+                        ocultarProgreso();
+                        return;
+                    }
+
+                    document.getElementById("buscador").disabled = false;
+                    document.getElementById("buscador").placeholder = "Buscar por RUT, Nombre o Dirección";
+                    ocultarMensaje();
+                    ocultarProgreso();
+                    document.getElementById("resultado").innerHTML = "";
+                    mostrarMensaje('info', `¡Datos cargados! ${datos.length} registros listos para buscar.`);
+                    setTimeout(() => ocultarMensaje(), 3000); // Ocultar el mensaje después de 3 segundos
+                },
+                
+                error: function(err, file) {
+                    console.error("Error Papa Parse durante descarga/parseo:", err);
+                    mostrarMensaje('error', `No se pudo cargar o procesar el archivo CSV. Error: ${err.message}. Asegúrate que la URL es correcta y el archivo es accesible.`);
+                    document.getElementById("buscador").disabled = true;
+                    document.getElementById("buscador").placeholder = "Error al cargar datos.";
+                    ocultarProgreso();
+                },
+
+                downloadProgress: function(event) {
+                    if (event.lengthComputable) {
+                        let percentage = (event.loaded / event.total) * 100;
+                        actualizarProgreso(percentage);
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error("Error al iniciar la carga del CSV:", error);
+            mostrarMensaje('error', `Error al iniciar la carga del CSV: ${error.message}. Asegúrate que la URL es correcta.`);
             document.getElementById("buscador").disabled = true;
-            return;
-          }
-
-          datos = results.data.map(row => {
-            const cleanedRow = {};
-            for (const key in row) {
-              if (Object.prototype.hasOwnProperty.call(row, key)) {
-                cleanedRow[key] = String(row[key] || '').trim();
-              }
-            }
-            return cleanedRow;
-          });
-
-          if (datos.length === 0) {
-            mostrarMensaje('info', 'El archivo CSV no contiene datos procesables después de la cabecera.');
-            document.getElementById("buscador").disabled = true;
-            return;
-          }
-
-          document.getElementById("buscador").disabled = false;
-          ocultarMensaje();
-          // NO LLAMAMOS A 'buscar()' AQUÍ INICIALMENTE.
-          // La tabla se mostrará solo cuando el usuario empiece a escribir.
-          document.getElementById("resultado").innerHTML = ""; // Asegurarse de que esté vacía al cargar el archivo
-        },
-        
-        error: function(err, file) {
-          console.error("Error al leer el archivo con Papa Parse:", err);
-          mostrarMensaje('error', 'Hubo un problema al leer el archivo. Asegúrate de que no esté corrupto.');
-          document.getElementById("buscador").disabled = true;
-          document.getElementById("resultado").innerHTML = "";
+            document.getElementById("buscador").placeholder = "Error de conexión.";
+            ocultarProgreso();
         }
-      });
-    });
+    }
 
+    // --- Iniciar la carga del CSV cuando la página se carga ---
+    document.addEventListener('DOMContentLoaded', cargarCSVDesdeURL);
+
+    // --- Lógica de Búsqueda con Debounce ---
     document.getElementById("buscador").addEventListener("input", function() {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(buscar, 300); 
@@ -262,15 +312,13 @@
         return;
       }
 
-      const valorBusqueda = document.getElementById("buscador").value.toLowerCase().trim(); // Añadido .trim()
+      const valorBusqueda = document.getElementById("buscador").value.toLowerCase().trim();
 
-      // *** MODIFICACIÓN CLAVE AQUÍ ***
       if (valorBusqueda === "") {
-        document.getElementById("resultado").innerHTML = ""; // Limpia la tabla si el buscador está vacío
-        ocultarMensaje(); // Oculta cualquier mensaje de "No hay coincidencias"
-        return; // Salir de la función si no hay texto de búsqueda
+        document.getElementById("resultado").innerHTML = "";
+        ocultarMensaje();
+        return;
       }
-      // ******************************
       
       const resultados = datos.filter(fila => {
         const rut = String(fila["RUT"] || '').toLowerCase();
